@@ -1,0 +1,87 @@
+### Assignment : Part 1 data analysis
+
+#### Data description
+
+For this assignment I'm going to analyze data related to the Titanic shipwrecks. Those data are availlable on the machine learning challenges kaggle website  :
+
+http://www.kaggle.com/c/titanic-gettingStarted/data
+
+There are 12 columns in this dataset and 891 records. See below a short description of the variables :
+
++ PassengerId : passenger id
++ Survived : 1 if the passenger surived 0 otherwise
++ Pclass : passenger's class (1st ~ Upper; 2nd ~ Middle; 3rd ~ Lower)
++ Name : passenger's name
++ Sex : passenger's sex
++ Age : passenger's age (in year)
++ SibSp : number of siblings/spouses aboard
++ Parch : number of parents/children aboard
++ Ticket : passenger's ticket number
++ Fare : passenger ticket fare
++ Cabin : passenger's cabin
++ Embarked : port of embarkation
+
+Our purpose is to try to build a model so as to predict the variable Survived.
+
+We also that there are 177 uncompleted cases and all those cases are uncompleted because of the variable Age.
+
+```{r tidy=FALSE}
+train <- read.csv("train.csv"); head(train)
+names(train)
+ncol(train)
+nrow(train)
+sum(complete.cases(train)==FALSE)
+any(is.na(train$PassengerId))
+any(is.na(train$Survived))
+any(is.na(train$Pclass))
+any(is.na(train$Name))
+any(is.na(train$Sex))
+any(is.na(train$Age))
+any(is.na(train$SibSp))
+any(is.na(train$Parch))
+any(is.na(train$Ticket))
+any(is.na(train$Fare))
+any(is.na(train$Cabin))
+any(is.na(train$Embarked))
+```
+
+Obviously variables : PassengerId, Name, Ticket, Cabin seem useless in terms of predictive power for the the variable Survived.
+
+Cramer's V is a well known metrics to measure of the association degree between two categorial variables. This indicator can be calculated thanks to the function $assocstats$ from the $vcd$ R package. 
+
+```{r tidy=FALSE}
+library(vcd)
+assocstats(table(train$Sex,train$Survived))$cramer
+assocstats(table(train$Pclass,train$Survived))$cramer
+assocstats(table(train$SibSp,train$Survived))$cramer
+assocstats(table(train$Embarked,train$Survived))$cramer
+assocstats(table(train$Parch,train$Survived))$cramer
+```
+
+According to Cramer's V we note that the most associated predictive nominal variables are from the most predictive to the less predictive : Sex, Pclass, SibSp, Embarked and Parch.
+
+Thanks to a specific plot (function $doubledecker$ from package $vcd$) plot we can also note that the crossing of the variables Sex and Pclass (the most two relevant categorial variables) seems a good feature to predict the survival of a passenger. Indeed we note that almost all passengers from female from class 1 & 2 survived as well as almost a major part of male from class 2 & 3 didn't survive. 
+
+```{r tidy=FALSE}
+doubledecker(Survived ~ Pclass + Sex, data=train)
+```
+
+For my first model I chose to use a simple logistic regression based on all available variables except PassengerId, Name, Ticket and Cabin. In addition I imputed missing values for age with the median thanks to the $impute$ function from package $Hmisc$.
+
+```{r tidy=FALSE}
+library(Hmisc)
+set.seed(12345)
+indices <- sample.int(round(0.7*nrow(train)))
+train_ <- subset(train, select=-c(PassengerId, Name, Ticket, Cabin))
+age <- impute(train_$Age, fun=median)
+train_$Age <- age 
+logistic <- glm(Survived ~ . , data=train_[indices, ], family="binomial")
+pred <- predict(logistic, newdata=train_[-indices, ])
+```
+
+Finaly I got a well classified ratio equal to $80$% with my test set and equal to $77$% to on the kaggle board (see additional screenshot on the Catalyst dropbox).
+
+```{r tidy=FALSE}
+check <- (pred>=0.5)==train[-indices, "Survived"]
+sum(check)/length(pred)
+```
